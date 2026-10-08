@@ -40,6 +40,7 @@ const canVoice = canListen || canRecord;
 const ai = {
   ready: false,
   forcedOff: new URLSearchParams(location.search).get("ai") === "off",
+  blockedUntil: 0,
 };
 
 const state = {
@@ -97,6 +98,7 @@ function interpret(field, raw) {
 // --- the AI path and its fallback ---------------------------------------------
 
 async function checkAi() {
+  if (Date.now() < ai.blockedUntil) return;
   ai.ready = !ai.forcedOff && canRecord && (await aiReady());
   updateVoiceStatus();
 }
@@ -106,7 +108,10 @@ function aiLost() {
   if (!ai.ready) return;
   ai.ready = false;
   updateVoiceStatus();
-  setTimeout(checkAi, 30000);
+  // Back off: an API that just failed (no credit, bad key, dead wifi) would
+  // otherwise cost the user a repeated answer on every retry.
+  ai.blockedUntil = Date.now() + 5 * 60 * 1000;
+  setTimeout(checkAi, 5 * 60 * 1000 + 100);
 }
 
 function updateVoiceStatus() {
