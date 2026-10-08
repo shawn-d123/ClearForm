@@ -4,6 +4,8 @@ An accessible, voice-driven appointment booking form. Hackathon demo with invent
 
 The accessible experience asks **one question per screen**: the question is shown large and read aloud, you answer by speaking or typing, the answer is read back for you to confirm, and at the end the whole form is read back and only sent when you confirm.
 
+Demo run sheet, pre-flight checklist and Q&A: [docs/DEMO.md](docs/DEMO.md).
+
 ## Run locally
 
 No build step. Serve the folder over HTTP (ES modules need it):
@@ -29,7 +31,7 @@ Add `?ai=off` to rehearse the offline fallback (browser speech recognition, no A
 
 ## Deploy
 
-Pushing to `main` deploys to Vercel. Set `OPENAI_API_KEY` in Vercel > Project > Settings > Environment Variables; the OpenAI account needs credit. `GET /api/extract` returns `{ ready }` to check the key is configured.
+Pushing to `main` deploys to Vercel. Set `OPENAI_API_KEY` in Vercel > Project > Settings > Environment Variables; the OpenAI account needs credit. `GET /api/extract` returns `{ ready }` (or `{ ready: false, reason }`, e.g. `credit_balance_exhausted`) after a tiny test call to the model, cached for 2 minutes.
 
 Voice input uses the browser's SpeechRecognition (Chrome, Edge, Safari). Where it is unavailable the form is fully usable by typing.
 

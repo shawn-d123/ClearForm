@@ -1,5 +1,5 @@
 // POST /api/extract  { fields, transcript, today, currentFieldId? }  ->  { values: { fieldId: value } }
-// GET  /api/extract  ->  { ready }   (health check: is the key configured?)
+// GET  /api/extract  ->  { ready, reason? }   (health check: can we actually call the model?)
 //
 // A fast model maps messy speech onto form fields. Temperature 0, JSON output,
 // only confident fields. Every value is checked here against the field list
@@ -55,8 +55,33 @@ function validFields(fields) {
     fields.every((f) => f && typeof f.id === "string" && typeof f.label === "string" && typeof f.type === "string");
 }
 
+// Health check result, cached per function instance so page loads don't each
+// cost an API call. A key alone isn't enough: an account with no credit
+// fails every call, so probe with the smallest possible request.
+let probe = { at: 0, result: null };
+const PROBE_TTL_MS = 2 * 60 * 1000;
+
+async function checkReady() {
+  if (!hasKey()) return { ready: false, reason: "no_key" };
+  if (probe.result && Date.now() - probe.at < PROBE_TTL_MS) return probe.result;
+  let result;
+  try {
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 1,
+      messages: [{ role: "user", content: "ok" }],
+    });
+    result = { ready: true };
+  } catch (err) {
+    result = { ready: false, reason: upstreamReason(err).upstreamCode || "upstream_error" };
+  }
+  probe = { at: Date.now(), result };
+  return result;
+}
+
 export default async function handler(req, res) {
-  if (req.method === "GET") return res.status(200).json({ ready: hasKey() });
+  if (req.method === "GET") return res.status(200).json(await checkReady());
   if (req.method !== "POST") return res.status(405).json({ error: "POST or GET only" });
   if (!sameOrigin(req)) return res.status(403).json({ error: "Forbidden" });
   if (!hasKey()) return res.status(503).json({ error: "Extraction is not configured" });

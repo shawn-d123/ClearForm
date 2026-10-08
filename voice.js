@@ -429,7 +429,7 @@ export async function extract(transcript, today, fieldList = allFields, currentF
 export async function aiReady() {
   if (!navigator.onLine) return false;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 3500);
+  const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
     const r = await fetch("/api/extract", { method: "GET", signal: ctrl.signal, cache: "no-store" });
     if (!r.ok) return false;
