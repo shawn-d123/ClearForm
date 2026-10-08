@@ -193,7 +193,7 @@ h1:focus, h1:focus-visible { outline: none; box-shadow: none; }
   color: var(--text); background: #fff;
   border: 3px solid var(--text); border-radius: 0;
 }
-.input:focus-visible { outline: 4px solid var(--focus); outline-offset: 0; box-shadow: inset 0 0 0 2px var(--text); }
+.input:focus { outline: 4px solid var(--focus); outline-offset: 0; box-shadow: inset 0 0 0 2px var(--text); }
 
 .radios { display: grid; gap: 0.9rem; }
 .radio { position: relative; }
@@ -269,8 +269,8 @@ h1:focus, h1:focus-visible { outline: none; box-shadow: none; }
 
 /* ---------- Trigger: accessible itself (large, labelled, 21:1, focusable) ---------- */
 .trigger-bar {
-  position: fixed; top: 0.75rem; right: 0.75rem; z-index: 20;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem;
+  position: fixed; bottom: 1rem; right: 1rem; z-index: 20;
+  display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 0.4rem;
 }
 .a11y-trigger {
   font: 700 1.05rem/1.2 Arial, sans-serif;
@@ -295,50 +295,109 @@ h1:focus, h1:focus-visible { outline: none; box-shadow: none; }
 .relay-active .accessible-view { animation: takeover 380ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes takeover { from { opacity: 0; transform: scale(0.97); } }
 
-/* ---------- THE BROKEN FORM: deliberately poor. Do not "fix". ---------- */
+/* ---------- THE BROKEN FORM: a believable dated surgery site. Do not "fix". ----------
+   It must look normal and readable to the audience: the real failures are
+   structural (no labels, mouse-only controls, silent errors). Text colours sit
+   just under the 4.5:1 minimum (WCAG 1.4.3), the type is small and the layout
+   cramped, like many real sites. */
 .broken-view {
-  min-height: 100vh; background: #fff;
-  font-family: "Segoe UI Light", "Helvetica Neue", Arial, sans-serif; font-size: 11px; line-height: 1.2;
-  color: #b5b5b5; /* about 2:1 on white */
-  padding-bottom: 3rem;
+  min-height: 100vh;
+  background: #e9edf1;
+  font-family: Verdana, Tahoma, Geneva, sans-serif;
+  font-size: 12px; line-height: 1.4;
+  color: #808080; /* about 3.9:1 on white: fails 1.4.3 */
 }
-.b-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #9cc3e6; color: #fff; }
-.b-logo { font-size: 13px; font-weight: 300; }
-.b-nav { font-size: 10px; margin-right: 11rem; }
-.b-title { font-size: 15px; color: #c4c4c4; margin: 10px 10px 2px; }
-.b-intro { font-size: 10px; margin: 0 10px 6px; color: #c9c9c9; }
-.b-form { margin: 0 10px; width: 230px; }
-.b-row { margin: 2px 0; position: relative; }
-.b-ph { position: absolute; left: 5px; top: 5px; color: #cfcfcf; cursor: text; }
-.b-input, .b-date, .b-select, .b-toggle {
-  display: block; width: 230px; height: 22px; margin: 0; padding: 3px 4px;
-  font: inherit; font-size: 11px; color: #b5b5b5; background: #fff;
-  border: 1px solid #ececec; border-radius: 0; box-sizing: border-box;
+.b-page { min-height: 100vh; display: flex; flex-direction: column; }
+.b-wrap { width: 100%; max-width: 980px; margin: 0 auto; padding: 0 16px; box-sizing: border-box; }
+
+.b-topbar { background: #2f3e4e; color: #9aa7b4; font-size: 11px; }
+.b-topbar-inner { display: flex; justify-content: space-between; padding-top: 4px; padding-bottom: 4px; }
+
+.b-header { background: linear-gradient(#4f8fd6, #2a66b0); color: #fff; border-bottom: 3px solid #1d4d8a; }
+.b-header-inner { display: flex; align-items: center; gap: 14px; padding-top: 16px; padding-bottom: 16px; }
+.b-crest {
+  width: 46px; height: 52px; flex: none;
+  background: radial-gradient(circle at 50% 38%, #fff 0 9px, transparent 10px), linear-gradient(#7fb3ea, #3d7cc7);
+  border: 2px solid #fff; border-radius: 6px 6px 23px 23px;
 }
-.b-input::placeholder { color: #cfcfcf; }
-.b-input:focus { outline: none; border-color: #e3e3e3; } /* focus removed: 2.4.7 */
-.b-date, .b-select { position: relative; cursor: pointer; }
+.b-logo { font-family: Georgia, "Times New Roman", serif; font-size: 28px; color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3); }
+.b-tagline { font-size: 12px; color: #d6e6f8; font-style: italic; }
+.b-phone { margin-left: auto; font-size: 14px; font-weight: bold; color: #fff; }
+
+.b-navbar { background: #dfe9f4; border-bottom: 1px solid #b9cce0; }
+.b-nav { display: flex; flex-wrap: wrap; }
+.b-nav-item { padding: 9px 14px; color: #5c87b6; font-size: 12px; cursor: pointer; border-right: 1px solid #c7d7e8; }
+.b-nav-item:hover { background: #cfdeef; }
+.b-nav-on { background: #fff; color: #2a66b0; font-weight: bold; }
+
+.b-main { display: grid; grid-template-columns: 1fr 230px; align-items: start; gap: 18px; padding-top: 18px; padding-bottom: 30px; flex: 1; }
+@media (max-width: 760px) { .b-main { grid-template-columns: 1fr; } }
+
+.b-content { background: #fff; border: 1px solid #d3dbe3; padding: 16px 20px 20px; }
+.b-crumbs { font-size: 11px; color: #9a9a9a; margin-bottom: 10px; }
+.b-title { font-family: Georgia, "Times New Roman", serif; font-size: 22px; color: #3f78bd; margin-bottom: 6px; }
+.b-intro { color: #888; margin-bottom: 14px; max-width: 560px; }
+.b-small { font-size: 10px; color: #a3a3a3; margin-top: 10px; }
+
+.b-card { background: #f6f8fa; border: 1px solid #e0e5ea; padding: 14px; }
+.b-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; max-width: 560px; }
+@media (max-width: 520px) { .b-form { grid-template-columns: 1fr; } }
+.b-row { position: relative; }
+.b-row--wide { grid-column: 1 / -1; }
+
+.b-input, .b-date, .b-select {
+  display: block; width: 100%; height: 30px; margin: 0; padding: 6px 8px;
+  font: inherit; font-size: 12px; color: #666; background: #fff;
+  border: 1px solid #ccd3da; border-radius: 3px; box-sizing: border-box;
+}
+.b-input:focus { outline: none; border-color: #b8c4cf; } /* focus indicator removed: 2.4.7 */
+.b-ph { position: absolute; left: 9px; top: 7px; color: #a6a6a6; cursor: text; pointer-events: auto; }
+.b-date, .b-select { position: relative; cursor: pointer; color: #a6a6a6; }
+.b-date[data-value], .b-select[data-value] { color: #666; }
 .b-date-icon {
-  position: absolute; right: 4px; top: 4px; width: 12px; height: 12px;
-  border: 1px solid #d5d5d5; border-top-width: 3px;
+  position: absolute; right: 7px; top: 7px; width: 14px; height: 13px;
+  border: 1px solid #9fb3c8; border-top: 4px solid #6f98c4; border-radius: 2px;
 }
+.b-select::after { content: ""; position: absolute; right: 9px; top: 12px; border: 5px solid transparent; border-top-color: #8a98a6; }
 .b-cal, .b-select-list {
-  position: absolute; left: -1px; top: 21px; z-index: 5;
-  background: #fff; border: 1px solid #ececec; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  position: absolute; left: -1px; top: 29px; z-index: 5;
+  background: #fff; border: 1px solid #ccd3da; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
 }
-.b-cal { display: grid; grid-template-columns: repeat(7, 24px); padding: 3px; }
-.b-cal-day { text-align: center; padding: 3px 0; cursor: pointer; }
-.b-cal-day:hover, .b-select-item:hover { background: #f5f5f5; }
-.b-select-list { width: 230px; }
-.b-select-item { padding: 4px; cursor: pointer; }
-.b-toggle { display: flex; gap: 2px; padding: 0; border: 0; }
-.b-toggle-item { flex: 1; text-align: center; padding: 4px 0; border: 1px solid #ececec; cursor: pointer; }
-.b-toggle-item.b-on { background: #f1f1f1; } /* selection by colour only: 1.4.1 */
-.b-invalid { border-color: #ff9a9a !important; } /* the only sign of an error: 3.3.1 */
+.b-cal { display: grid; grid-template-columns: repeat(7, 28px); padding: 4px; color: #666; }
+.b-cal-day { text-align: center; padding: 4px 0; cursor: pointer; }
+.b-cal-day:hover, .b-select-item:hover { background: #e6eef7; }
+.b-select-list { width: 100%; color: #666; }
+.b-select-item { padding: 6px 8px; cursor: pointer; }
+
+.b-toggle { display: flex; gap: 0; height: 30px; }
+.b-toggle-item {
+  flex: 1; display: grid; place-items: center;
+  border: 1px solid #ccd3da; background: #fff; color: #888; cursor: pointer;
+}
+.b-toggle-item:first-child { border-radius: 3px 0 0 3px; }
+.b-toggle-item:last-child { border-radius: 0 3px 3px 0; border-left: 0; }
+.b-toggle-item.b-on { background: #eef3f8; } /* selection shown by a faint tint only: 1.4.1 */
+
+.b-invalid, .b-toggle.b-invalid .b-toggle-item { border-color: #d93636 !important; box-shadow: 0 0 0 1px #d93636; } /* the only sign of an error: 3.3.1 */
+
+.b-actions { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
 .b-submit {
-  display: inline-block; margin-top: 4px; padding: 3px 10px;
-  background: #b9d6ef; color: #fff; font-size: 11px; cursor: pointer;
+  display: inline-block; padding: 7px 22px;
+  background: linear-gradient(#8fd06b, #5aa935); border: 1px solid #4f9a2d; border-radius: 3px;
+  color: #fff; font-weight: bold; font-size: 13px; cursor: pointer; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
 }
+.b-submit:hover { background: linear-gradient(#83c75e, #4f9a2d); }
+.b-reset { color: #9a9a9a; text-decoration: underline; cursor: pointer; font-size: 11px; }
+
+.b-sidebar { display: flex; flex-direction: column; gap: 14px; }
+.b-box { background: #fff; border: 1px solid #d3dbe3; padding: 10px 12px; }
+.b-box-title { font-weight: bold; color: #3f78bd; margin-bottom: 6px; border-bottom: 1px solid #e3e8ed; padding-bottom: 4px; }
+.b-box--alert { background: #fff6f6; border-color: #f0caca; color: #c46a6a; }
+.b-box--alert .b-box-title { color: #c25555; }
+.b-hours { font-size: 11px; margin-bottom: 2px; }
+.b-fake-link { color: #5c87b6; text-decoration: underline; cursor: pointer; margin-bottom: 4px; }
+
+.b-footer { background: #2f3e4e; color: #8795a3; font-size: 11px; padding: 12px 0; }
 
 [hidden] { display: none !important; }
 

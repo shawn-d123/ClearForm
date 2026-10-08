@@ -116,7 +116,7 @@ const PLACEHOLDERS = { fullName: "Name", nhsNo: "NHS no.", reason: "Reason" };
 
 function fakeDatePicker(field) {
   const wrap = el("div", { class: "b-date", "data-field": field.id });
-  const display = el("div", { class: "b-date-display", text: "dd/mm/yyyy" });
+  const display = el("div", { class: "b-date-display", text: `${field.label} (dd/mm/yyyy)` });
   const icon = el("div", { class: "b-date-icon" });
   const cal = el("div", { class: "b-cal", hidden: true });
   for (let d = 1; d <= 31; d++) {
@@ -137,7 +137,7 @@ function fakeDatePicker(field) {
 
 function fakeSelect(field) {
   const wrap = el("div", { class: "b-select", "data-field": field.id });
-  const display = el("div", { class: "b-select-display", text: "Select" });
+  const display = el("div", { class: "b-select-display", text: `${field.label}...` });
   const list = el("div", { class: "b-select-list", hidden: true });
   field.options.forEach((opt) => {
     const item = el("div", { class: "b-select-item", text: opt });
@@ -178,7 +178,7 @@ export function renderBrokenForm(container) {
     else if (field.id === "time") control = fakeToggle(field);
     else if (field.type === "choice") control = fakeSelect(field);
     else control = el("input", { class: "b-input", type: "text", "data-field": field.id });
-    const row = el("div", { class: "b-row" }, control);
+    const row = el("div", { class: field.id === "reason" ? "b-row b-row--wide" : "b-row" }, control);
     if (control.tagName === "INPUT") {
       // A painted-on "placeholder": grey text over the input, tied to nothing,
       // gone the moment you focus. A screen reader just says "edit text".
@@ -191,7 +191,7 @@ export function renderBrokenForm(container) {
     }
     form.append(row);
   }
-  const submitBtn = el("div", { class: "b-submit", text: "Submit" });
+  const submitBtn = el("div", { class: "b-submit", text: "Submit »" });
   submitBtn.addEventListener("click", () => {
     // Silent failure: a red outline on empty required controls, nothing else.
     for (const field of fields) {
@@ -201,13 +201,57 @@ export function renderBrokenForm(container) {
     }
   });
   form.append(submitBtn);
+  const actions = el("div", { class: "b-actions" },
+    submitBtn,
+    el("div", { class: "b-reset", text: "Clear form" }));
+
+  // A believable, dated surgery website. Everything is a div: no landmarks,
+  // no headings, no links. Looks fine to a sighted user; a screen reader
+  // user gets a flat stream of text and three unnamed edit boxes.
+  const nav = el("div", { class: "b-nav" });
+  ["Home", "About us", "Our team", "Appointments", "Prescriptions", "Test results", "Contact"].forEach((item) => {
+    nav.append(el("div", { class: item === "Appointments" ? "b-nav-item b-nav-on" : "b-nav-item", text: item }));
+  });
+
+  const sidebar = el("div", { class: "b-sidebar" },
+    el("div", { class: "b-box" },
+      el("div", { class: "b-box-title", text: "Opening hours" }),
+      el("div", { class: "b-hours", text: "Mon – Fri 8:00am – 6:30pm" }),
+      el("div", { class: "b-hours", text: "Sat 9:00am – 12:00pm (pre-booked only)" }),
+      el("div", { class: "b-hours", text: "Sun Closed" })),
+    el("div", { class: "b-box b-box--alert" },
+      el("div", { class: "b-box-title", text: "Urgent?" }),
+      el("div", { text: "If it is an emergency call 999. For urgent advice out of hours call 111." })),
+    el("div", { class: "b-box" },
+      el("div", { class: "b-box-title", text: "Quick links" }),
+      el("div", { class: "b-fake-link", text: "Repeat prescriptions" }),
+      el("div", { class: "b-fake-link", text: "Register as a new patient" }),
+      el("div", { class: "b-fake-link", text: "Cancel an appointment" })));
+
+  const content = el("div", { class: "b-content" },
+    el("div", { class: "b-crumbs", text: "Home  ›  Appointments  ›  Book online" }),
+    el("div", { class: "b-title", text: "Book an Appointment Online" }),
+    el("div", { class: "b-intro", text: "Please complete ALL fields below and press Submit. Mandatory fields will be highlighted in red. Appointments are subject to availability and will be confirmed by telephone." }),
+    el("div", { class: "b-card" }, form, actions),
+    el("div", { class: "b-small", text: "By pressing Submit you agree to our terms and conditions and privacy notice. Please allow 2 working days for a response." }));
+
   container.replaceChildren(
-    el("div", { class: "b-header" },
-      el("div", { class: "b-logo", text: "ClearForm Surgery" }),
-      el("div", { class: "b-nav", text: "Home | Services | Contact" })),
-    el("div", { class: "b-title", text: "Book appt" }),
-    el("div", { class: "b-intro", text: "Please complete all fields. Fields marked in red are mandatory." }),
-    form);
+    el("div", { class: "b-page" },
+      el("div", { class: "b-topbar" },
+        el("div", { class: "b-wrap b-topbar-inner" },
+          el("div", { text: "Welcome to our online services" }),
+          el("div", { class: "b-textsize", text: "Text size  A  A  A" }))),
+      el("div", { class: "b-header" },
+        el("div", { class: "b-wrap b-header-inner" },
+          el("div", { class: "b-crest" }),
+          el("div", {},
+            el("div", { class: "b-logo", text: "ClearForm Surgery" }),
+            el("div", { class: "b-tagline", text: "Caring for our community since 1987" })),
+          el("div", { class: "b-phone", text: "Tel: 01632 960 123" }))),
+      el("div", { class: "b-navbar" }, el("div", { class: "b-wrap" }, nav)),
+      el("div", { class: "b-wrap b-main" }, content, sidebar),
+      el("div", { class: "b-footer" },
+        el("div", { class: "b-wrap", text: "© 2026 ClearForm Surgery (invented for a demonstration)  |  Accessibility statement  |  Privacy  |  Cookies  |  Site map" }))));
   return form;
 }
 
