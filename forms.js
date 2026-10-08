@@ -1,6 +1,6 @@
-// Renders the forms from the shared schema and owns the value and error
-// helpers. Phase 1: the accessible form, one question per step.
-// Phase 2 adds renderBrokenForm() here, generated from the same schema.
+// Renders both forms from the shared schema and owns the value and error
+// helpers. The broken "before" and the accessible "after" are generated from
+// the same fields array, so they are provably the same form.
 
 import { fields, questionFor, hintFor } from "./form-schema.js";
 import { formatDateLong } from "./normalize.js";
@@ -100,6 +100,118 @@ export function renderAccessibleForm(container) {
   container.replaceChildren(form);
   return form;
 }
+
+// --- the broken "before" ------------------------------------------------------
+// Each failure is deliberate and maps to a WCAG success criterion we can name:
+//   no labels, only painted-on hint text ...... 1.3.1, 3.3.2, 4.1.2
+//   custom div "dropdown", not focusable ...... 2.1.1, 4.1.2
+//   mouse-only calendar date picker ............ 2.1.1
+//   time options chosen by colour only ......... 1.4.1
+//   submit is a div, not keyboard reachable .... 2.1.1
+//   error is a red outline, no text, silent .... 3.3.1, 4.1.3
+//   light grey 11px text, cramped layout ....... 1.4.3, 1.4.4
+// Do not fix any of these. They are the point.
+
+const PLACEHOLDERS = { fullName: "Name", nhsNo: "NHS no.", reason: "Reason" };
+
+function fakeDatePicker(field) {
+  const wrap = el("div", { class: "b-date", "data-field": field.id });
+  const display = el("div", { class: "b-date-display", text: "dd/mm/yyyy" });
+  const icon = el("div", { class: "b-date-icon" });
+  const cal = el("div", { class: "b-cal", hidden: true });
+  for (let d = 1; d <= 31; d++) {
+    const day = el("div", { class: "b-cal-day", text: String(d) });
+    day.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const now = new Date();
+      display.textContent = `${String(d).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
+      wrap.dataset.value = display.textContent;
+      cal.hidden = true;
+    });
+    cal.append(day);
+  }
+  wrap.addEventListener("click", () => { cal.hidden = !cal.hidden; });
+  wrap.append(display, icon, cal);
+  return wrap;
+}
+
+function fakeSelect(field) {
+  const wrap = el("div", { class: "b-select", "data-field": field.id });
+  const display = el("div", { class: "b-select-display", text: "Select" });
+  const list = el("div", { class: "b-select-list", hidden: true });
+  field.options.forEach((opt) => {
+    const item = el("div", { class: "b-select-item", text: opt });
+    item.addEventListener("click", (e) => {
+      e.stopPropagation();
+      display.textContent = opt;
+      wrap.dataset.value = opt;
+      list.hidden = true;
+    });
+    list.append(item);
+  });
+  wrap.addEventListener("click", () => { list.hidden = !list.hidden; });
+  wrap.append(display, list);
+  return wrap;
+}
+
+function fakeToggle(field) {
+  const wrap = el("div", { class: "b-toggle", "data-field": field.id });
+  field.options.forEach((opt) => {
+    // "AM" / "PM", with the selection shown only by a slightly darker grey.
+    const item = el("div", { class: "b-toggle-item", text: opt === "Morning" ? "AM" : opt === "Afternoon" ? "PM" : opt });
+    item.addEventListener("click", () => {
+      wrap.querySelectorAll(".b-toggle-item").forEach((i) => i.classList.remove("b-on"));
+      item.classList.add("b-on");
+      wrap.dataset.value = opt;
+    });
+    wrap.append(item);
+  });
+  return wrap;
+}
+
+/** The "before": the same form, built the way too many real forms are. */
+export function renderBrokenForm(container) {
+  const form = el("div", { class: "b-form" });
+  for (const field of fields) {
+    let control;
+    if (field.type === "date") control = fakeDatePicker(field);
+    else if (field.id === "time") control = fakeToggle(field);
+    else if (field.type === "choice") control = fakeSelect(field);
+    else control = el("input", { class: "b-input", type: "text", "data-field": field.id });
+    const row = el("div", { class: "b-row" }, control);
+    if (control.tagName === "INPUT") {
+      // A painted-on "placeholder": grey text over the input, tied to nothing,
+      // gone the moment you focus. A screen reader just says "edit text".
+      const ph = el("div", { class: "b-ph", text: PLACEHOLDERS[field.id] || field.label });
+      const sync = () => { ph.hidden = document.activeElement === control || Boolean(control.value); };
+      control.addEventListener("focus", sync);
+      control.addEventListener("blur", sync);
+      ph.addEventListener("click", () => control.focus());
+      row.append(ph);
+    }
+    form.append(row);
+  }
+  const submitBtn = el("div", { class: "b-submit", text: "Submit" });
+  submitBtn.addEventListener("click", () => {
+    // Silent failure: a red outline on empty required controls, nothing else.
+    for (const field of fields) {
+      const node = form.querySelector(`[data-field="${field.id}"]`);
+      const value = node.tagName === "INPUT" ? node.value.trim() : node.dataset.value;
+      node.classList.toggle("b-invalid", Boolean(field.required && !value));
+    }
+  });
+  form.append(submitBtn);
+  container.replaceChildren(
+    el("div", { class: "b-header" },
+      el("div", { class: "b-logo", text: "ClearForm Surgery" }),
+      el("div", { class: "b-nav", text: "Home | Services | Contact" })),
+    el("div", { class: "b-title", text: "Book appt" }),
+    el("div", { class: "b-intro", text: "Please complete all fields. Fields marked in red are mandatory." }),
+    form);
+  return form;
+}
+
+// --- accessible form lookups ---------------------------------------------------
 
 export function getStepEl(id) {
   return document.getElementById(stepId(id));

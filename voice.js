@@ -181,3 +181,61 @@ export function stopListening() {
 export function isListening() {
   return Boolean(activeRecognition);
 }
+
+// --- voice trigger -----------------------------------------------------------
+
+/**
+ * Listen in the background for a phrase, e.g. "accessible mode", and call cb
+ * when it is heard. Keeps restarting (browsers end continuous recognition
+ * after a pause) until the returned stop() is called. Returns a no-op stop
+ * when recognition is unsupported. The button is the reliable trigger; this
+ * is the flourish.
+ */
+export function onVoiceTrigger(phrase, cb, { onstate } = {}) {
+  if (!Recognition) return () => {};
+  const target = phrase.toLowerCase();
+  // Near-misses speech recognition commonly returns for "accessible mode".
+  const variants = [target, target.replace("accessible", "accessibility"),
+    target.replace("mode", "mood"), target.replace("mode", "mod")];
+  let active = true;
+  let rec = null;
+  let failures = 0;
+
+  const start = () => {
+    if (!active || activeRecognition) return; // never fight an answer listener
+    rec = new Recognition();
+    rec.lang = "en-GB";
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.onresult = (e) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const said = e.results[i][0].transcript.toLowerCase();
+        if (variants.some((v) => said.includes(v))) {
+          stop();
+          cb(said);
+          return;
+        }
+      }
+    };
+    rec.onstart = () => { failures = 0; onstate && onstate(true); };
+    rec.onerror = (e) => {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") active = false;
+      failures++;
+    };
+    rec.onend = () => {
+      onstate && onstate(false);
+      rec = null;
+      if (active && failures < 5) setTimeout(start, 300);
+    };
+    try { rec.start(); } catch { /* already started */ }
+  };
+
+  function stop() {
+    active = false;
+    if (rec) { try { rec.abort(); } catch { /* stopped */ } rec = null; }
+    onstate && onstate(false);
+  }
+
+  start();
+  return stop;
+}

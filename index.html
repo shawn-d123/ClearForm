@@ -9,6 +9,20 @@
   <script type="module" src="app.js"></script>
 </head>
 <body>
+  <!-- The trigger: a real, labelled, high-contrast button, first in the tab
+       order and fixed in the corner. It is the reliable way in; saying
+       "accessible mode" is the flourish. -->
+  <div class="trigger-bar" id="trigger-bar">
+    <button type="button" id="a11y-btn" class="a11y-trigger">Accessible mode</button>
+    <p id="voice-chip" class="voice-chip" hidden><span class="pulse" aria-hidden="true"></span> Say “accessible mode”</p>
+  </div>
+
+  <!-- THE BROKEN FORM (the "before"). Rendered from form-schema.js by
+       renderBrokenForm() with deliberate WCAG failures. -->
+  <div id="broken-view" class="broken-view"></div>
+
+  <!-- THE ACCESSIBLE RELAY (the "after"). Full screen once switched on. -->
+  <div id="accessible-view" class="accessible-view" hidden>
   <a class="skip-link" href="#main">Skip to main content</a>
 
   <header class="site-header">
@@ -24,20 +38,13 @@
 
   <main id="main" class="container" tabindex="-1">
 
-    <!-- Start screen. The tap on Start also unlocks audio in the browser. -->
-    <section id="start-screen" class="screen" aria-labelledby="start-heading">
-      <h1 id="start-heading">Book an appointment</h1>
-      <p class="lead">Answer 7 short questions, one at a time. Each question is read aloud. You can answer by speaking or by typing, and every answer is read back to you before you move on.</p>
-      <p>Before anything is sent, you will hear all of your answers and can change any of them.</p>
-      <button type="button" id="start-btn" class="button button--start">Start now</button>
-    </section>
-
     <!-- The accessible relay: one question per screen. -->
-    <section id="relay" class="relay" hidden aria-label="Appointment booking, one question at a time">
+    <section id="relay" class="relay" aria-label="Appointment booking, one question at a time">
 
       <div class="controls" role="group" aria-label="Voice settings">
         <button type="button" id="back-btn" class="back-link">Back<span class="visually-hidden"> to previous question</span></button>
         <div class="controls-right">
+          <button type="button" id="exit-btn" class="button button--small button--secondary">Exit accessible mode</button>
           <button type="button" id="repeat-btn" class="button button--small button--secondary">Repeat</button>
           <button type="button" id="voice-toggle" class="button button--small button--secondary" aria-pressed="true">Read aloud</button>
           <button type="button" id="handsfree-toggle" class="button button--small button--secondary" aria-pressed="true">Listen automatically</button>
@@ -110,6 +117,7 @@
       <p id="listening" class="listening" hidden><span class="pulse" aria-hidden="true"></span> Listening… speak now</p>
     </section>
   </main>
+  </div>
 
   <!-- Live regions. They exist from page load so changes are announced. -->
   <div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>

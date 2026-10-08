@@ -4,12 +4,12 @@
 
 import { fields, answers, questionFor, hintFor, listOptions } from "./form-schema.js";
 import {
-  renderAccessibleForm, getStepEl, getFocusTarget, getRawValue,
+  renderBrokenForm, renderAccessibleForm, getStepEl, getFocusTarget, getRawValue,
   setFieldValue, showFieldError, clearFieldError, clearErrors, announce,
 } from "./forms.js";
 import {
   speak, stopSpeaking, repeatLast, setRate, setMuted, isMuted,
-  listenFallback, stopListening, canListen,
+  listenFallback, stopListening, canListen, onVoiceTrigger,
 } from "./voice.js";
 import {
   parseDate, matchChoice, tidyName, tidyText, tidyNhsNumber,
@@ -313,17 +313,68 @@ function trySubmit() {
 
 // --- start and wiring --------------------------------------------------------
 
+/** Hides the broken form, takes over the screen with the relay, starts the loop. */
 export function startAccessibleMode() {
-  $("start-screen").hidden = true;
-  $("relay").hidden = false;
+  stopVoiceTrigger();
+  $("broken-view").hidden = true;
+  $("trigger-bar").hidden = true;
+  $("accessible-view").hidden = false;
   document.body.classList.add("relay-active");
+  document.title = "Book an appointment (accessible mode) – ClearForm";
+  window.scrollTo(0, 0);
   renderAccessibleForm($("form-host"));
   wireForm();
   for (const k of Object.keys(answers)) delete answers[k];
   state.returnToReview = false;
   showQuestion(0, {
-    prefix: `Accessible booking. There are ${fields.length} questions. You can speak or type each answer, and you can say back, repeat, or skip at any time.`,
+    prefix: `Accessible mode on. Booking an appointment. I'll ask ${fields.length} questions, one at a time. You can speak or type each answer, and say back, repeat, or skip at any time.`,
   });
+}
+
+/** Back to the original form. The user is always in control of the assistant. */
+function exitAccessibleMode() {
+  cancelListening();
+  stopSpeaking();
+  state.mode = "start";
+  document.body.classList.remove("relay-active");
+  $("accessible-view").hidden = true;
+  $("broken-view").hidden = false;
+  $("trigger-bar").hidden = false;
+  document.title = "Book an appointment – ClearForm";
+  $("a11y-btn").focus();
+  announce("Accessible mode off.");
+  startVoiceTrigger();
+}
+
+// --- triggers: button + voice --------------------------------------------------
+
+let stopTrigger = () => {};
+
+function startVoiceTrigger() {
+  stopTrigger();
+  stopTrigger = onVoiceTrigger("accessible mode", startAccessibleMode, {
+    onstate: (on) => { $("voice-chip").hidden = !on; },
+  });
+}
+
+function stopVoiceTrigger() {
+  stopTrigger();
+  stopTrigger = () => {};
+  $("voice-chip").hidden = true;
+}
+
+// Browsers only allow speech and the mic after a user gesture, so the voice
+// trigger starts on the first click or key press anywhere on the page.
+function armVoiceTriggerOnFirstGesture() {
+  if (!canListen) return;
+  const arm = () => {
+    document.removeEventListener("click", arm, true);
+    document.removeEventListener("keydown", arm, true);
+    // If that first gesture was the Accessible mode button, don't start.
+    setTimeout(() => { if (state.mode === "start") startVoiceTrigger(); }, 0);
+  };
+  document.addEventListener("click", arm, true);
+  document.addEventListener("keydown", arm, true);
 }
 
 function wireForm() {
@@ -349,7 +400,10 @@ function updateToggles() {
 }
 
 function init() {
-  $("start-btn").addEventListener("click", startAccessibleMode);
+  renderBrokenForm($("broken-view"));
+  $("a11y-btn").addEventListener("click", startAccessibleMode);
+  $("exit-btn").addEventListener("click", exitAccessibleMode);
+  armVoiceTriggerOnFirstGesture();
 
   if (!canListen) {
     $("speak-btn").hidden = true;
@@ -399,7 +453,7 @@ function init() {
 
 init();
 
-// Exposed for debugging and the Phase 2 trigger wiring.
+// Exposed for debugging and testing.
 // clearform.hear("next Tuesday") simulates a spoken answer for testing.
 const handlers = () => ({ question: onSpokenAnswer, confirm: onSpokenConfirm, review: onSpokenReview });
 window.clearform = {
