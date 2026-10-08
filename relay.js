@@ -35,8 +35,70 @@ export function renderConfirm(field, value, index) {
   $("confirm-count").textContent = `Question ${index + 1} of ${fields.length}`;
   $("confirm-label").textContent = field.label;
   $("confirm-value").textContent = displayValue(field, value);
+  $("confirm-value").hidden = false;
+  $("confirm-list").hidden = true;
   showScreen("confirm-screen");
   $("confirm-heading").focus();
+}
+
+/** Confirm several answers captured from one sentence. values: { fieldId: value } */
+export function renderConfirmMulti(values) {
+  const ids = Object.keys(values);
+  $("confirm-count").textContent = "From what you said";
+  $("confirm-label").textContent = `I filled in ${ids.length} answers`;
+  $("confirm-value").hidden = true;
+  const list = $("confirm-list");
+  list.replaceChildren();
+  for (const field of fields.filter((f) => ids.includes(f.id))) {
+    const row = document.createElement("div");
+    row.className = "summary-row";
+    const dt = document.createElement("dt");
+    dt.textContent = field.label;
+    const dd = document.createElement("dd");
+    dd.textContent = displayValue(field, values[field.id]);
+    row.append(dt, dd);
+    list.append(row);
+  }
+  list.hidden = false;
+  showScreen("confirm-screen");
+  $("confirm-heading").focus();
+}
+
+export function confirmMultiSpeech(values) {
+  const lines = fields
+    .filter((f) => values[f.id])
+    .map((f) => `${f.label}: ${spokenValue(f, values[f.id])}.`);
+  return `I heard ${lines.length} answers. ${lines.join(" ")} Is that all right? Say yes, or no.`;
+}
+
+/** The missing-field message, used on screen, in the live region and spoken. */
+export function missingMessage(field) {
+  return `Your ${field.label.toLowerCase().replace("nhs", "NHS")} is missing. Please add it.`;
+}
+
+/**
+ * GOV.UK error summary at the top of the review: a heading, then one link
+ * per problem that jumps to the question. Focus moves to it so screen reader
+ * users hear it straight away. Returns the text to speak.
+ */
+export function showErrorSummary(missing, onFix) {
+  const box = $("error-summary");
+  const list = $("error-summary-list");
+  list.replaceChildren();
+  for (const field of missing) {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "link-button error-link";
+    btn.textContent = missingMessage(field);
+    btn.addEventListener("click", () => onFix(field.id));
+    li.append(btn);
+    list.append(li);
+  }
+  box.hidden = false;
+  box.focus();
+  const first = missing[0];
+  return `There is a problem. ${missing.map(missingMessage).join(" ")} Say yes to add your ${first.label.toLowerCase()} now.`;
 }
 
 export function confirmSpeech(field, value, viaVoice) {

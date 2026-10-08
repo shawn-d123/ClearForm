@@ -416,9 +416,12 @@ export async function transcribe(audioBase64, mimeType = lastMimeType) {
   return (text || "").trim();
 }
 
-/** Transcript to { fieldId: value } via /api/extract. fieldList defaults to the whole form. */
-export async function extract(transcript, today, fieldList = allFields) {
-  const { values } = await postJson("/api/extract", { fields: fieldList, transcript, today }, 9000);
+/**
+ * Transcript to { fieldId: value } via /api/extract. fieldList defaults to the
+ * whole form; currentFieldId says which question was just asked.
+ */
+export async function extract(transcript, today, fieldList = allFields, currentFieldId) {
+  const { values } = await postJson("/api/extract", { fields: fieldList, transcript, today, currentFieldId }, 9000);
   return values || {};
 }
 

@@ -226,6 +226,9 @@ h1:focus, h1:focus-visible { outline: none; box-shadow: none; }
 .error-summary { border: 5px solid var(--red); padding: 1.25rem; margin-bottom: 2rem; }
 .error-summary:focus { outline: 4px solid var(--focus); }
 .error-summary-title { margin-top: 0; }
+.error-summary ul { margin: 0; padding-left: 0; list-style: none; }
+.error-link { color: var(--red); font-weight: 700; font-size: 1.15rem; text-align: left; }
+.confirm-list { margin-top: 0.5rem; }
 
 /* Confirm */
 .confirm-heading { margin-bottom: 0.5rem; }

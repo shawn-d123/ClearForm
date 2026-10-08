@@ -70,6 +70,7 @@
           <button type="button" id="skip-btn" class="button button--secondary" hidden>Skip this question</button>
         </div>
         <p id="speak-help" class="help">Say your answer after the question. You can also say “repeat”, “back” or “skip”.</p>
+        <p id="multi-help" class="help" hidden>Tip: you can say several answers at once, like “I’m Maya Patel, born 3 March 1992, and I need a GP appointment next Tuesday afternoon.”</p>
         <p id="voice-mode" class="help voice-mode"></p>
         <p id="no-mic-help" class="help" hidden>Speaking your answer is not available in this browser. Please type your answer.</p>
       </div>
@@ -82,6 +83,7 @@
           <span class="confirm-value" id="confirm-value"></span>
           <span class="confirm-question">Is this right?</span>
         </h1>
+        <dl id="confirm-list" class="summary-list confirm-list" hidden></dl>
         <div class="actions">
           <button type="button" id="confirm-yes" class="button">Yes, continue</button>
           <button type="button" id="confirm-no" class="button button--secondary">No, change it</button>

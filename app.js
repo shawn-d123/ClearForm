@@ -19,7 +19,8 @@ import {
 } from "./normalize.js";
 import {
   showScreen, renderConfirm, confirmSpeech, readBack, fieldFromSpeech,
-  missingRequired, submit, spokenValue,
+  missingRequired, submit, spokenValue, renderConfirmMulti, confirmMultiSpeech,
+  missingMessage, showErrorSummary,
 } from "./relay.js";
 
 const $ = (id) => document.getElementById(id);
@@ -47,6 +48,7 @@ const state = {
   mode: "start",        // start | question | confirm | review | done
   index: 0,             // current field
   pending: null,        // value awaiting confirmation
+  pendingMulti: null,   // { fieldId: value } from one sentence, awaiting confirmation
   viaVoice: false,      // was the pending value spoken?
   handsFree: canVoice,  // listen automatically after each prompt
   typedThisStep: false, // user started typing, so don't open the mic
@@ -65,8 +67,8 @@ function interpret(field, raw) {
   if (!text) {
     if (!field.required) return { value: "" };
     return { error: field.type === "choice"
-      ? `Choose ${listOptions(field.options)}.`
-      : `Enter your ${field.label.toLowerCase()}.` };
+      ? `Your ${field.label.toLowerCase()} is missing. Choose ${listOptions(field.options)}.`
+      : missingMessage(field) };
   }
   switch (field.id) {
     case "fullName":
@@ -120,6 +122,7 @@ function updateVoiceStatus() {
   el.textContent = ai.ready ? "Voice input: enhanced (online)"
     : canListen ? "Voice input: on-device"
     : "Voice input is not available in this browser, please type.";
+  $("multi-help").hidden = !ai.ready;
 }
 
 // --- listening ---------------------------------------------------------------
@@ -251,11 +254,17 @@ async function onSpokenAnswer(text) {
   if (ai.ready) {
     const index = state.index;
     const token = ++listenToken;
+    // A longer answer may hold several answers ("I'm Maya Patel, born 3 March
+    // 1992, I need a GP next Tuesday afternoon"), so offer the model the
+    // whole form. The question just asked is always passed, so a bare answer
+    // still lands in the right field.
+    const many = text.trim().split(/\s+/).length >= 6;
+    let good = {};
     setListeningUI("thinking");
     startThinking();
     try {
-      const values = await extract(text, todayIso(), [field]);
-      if (values[field.id]) raw = values[field.id];
+      const values = await extract(text, todayIso(), many ? fields : [field], field.id);
+      good = validValues(values);
     } catch {
       // Fall through to on-device parsing of the raw transcript.
     } finally {
@@ -264,8 +273,25 @@ async function onSpokenAnswer(text) {
     // The user may have typed, gone back or cancelled while we waited.
     if (token !== listenToken || state.mode !== "question" || state.index !== index) return;
     setListeningUI(null);
+    if (Object.keys(good).some((id) => id !== field.id)) {
+      state.pendingMulti = good;
+      return showConfirmMulti();
+    }
+    if (good[field.id]) raw = good[field.id];
   }
   takeAnswer(raw, true);
+}
+
+/** Keep only extracted values that pass the same checks as a typed answer. */
+function validValues(values) {
+  const good = {};
+  for (const [id, v] of Object.entries(values || {})) {
+    const f = fields.find((x) => x.id === id);
+    if (!f) continue;
+    const { value, error } = interpret(f, v);
+    if (!error && value) good[id] = value;
+  }
+  return good;
 }
 
 function takeAnswer(raw, viaVoice) {
@@ -299,9 +325,16 @@ function skip() {
   advance(`Skipped ${field.label.toLowerCase()}.`);
 }
 
+/** The next question without an answer, after `from`, wrapping to the start. */
+function nextUnanswered(from) {
+  for (let i = from + 1; i < fields.length; i++) if (!(fields[i].id in answers)) return i;
+  return fields.findIndex((f) => !(f.id in answers));
+}
+
 function advance(prefix) {
   if (state.returnToReview) return showReview(prefix);
-  if (state.index + 1 < fields.length) return showQuestion(state.index + 1, { prefix });
+  const next = nextUnanswered(state.index);
+  if (next >= 0) return showQuestion(next, { prefix });
   showReview(prefix);
 }
 
@@ -324,7 +357,15 @@ function runCommand(cmd) {
 
 // --- confirm screen ----------------------------------------------------------
 
+function showConfirmMulti() {
+  cancelListening();
+  state.mode = "confirm";
+  renderConfirmMulti(state.pendingMulti);
+  speak(confirmMultiSpeech(state.pendingMulti), { onend: thenListen(onSpokenConfirm) });
+}
+
 function showConfirm() {
+  if (state.pendingMulti) return showConfirmMulti();
   cancelListening();
   state.mode = "confirm";
   const field = current();
@@ -345,6 +386,16 @@ function onSpokenConfirm(text) {
 }
 
 function acceptAnswer() {
+  if (state.pendingMulti) {
+    for (const [id, value] of Object.entries(state.pendingMulti)) {
+      answers[id] = value;
+      setFieldValue(id, value);
+      clearFieldError(id);
+    }
+    state.pendingMulti = null;
+    const remaining = fields.filter((f) => !(f.id in answers)).length;
+    return advance(remaining ? `Got it. ${remaining === 1 ? "Just one more question." : `Just ${remaining} more questions.`}` : "Got it.");
+  }
   const field = current();
   answers[field.id] = state.pending;
   setFieldValue(field.id, state.pending);
@@ -353,6 +404,10 @@ function acceptAnswer() {
 }
 
 function rejectAnswer() {
+  if (state.pendingMulti) {
+    state.pendingMulti = null;
+    return showQuestion(state.index, { prefix: "Okay, let's go one question at a time." });
+  }
   state.pending = null;
   showQuestion(state.index, { prefix: "Okay, let's try that again.", keepValue: true });
 }
@@ -364,7 +419,13 @@ function showReview(prefix = "") {
   state.mode = "review";
   state.returnToReview = false;
   clearErrors();
-  const text = readBack(answers, changeField);
+  let text = readBack(answers, changeField);
+  const missing = missingRequired(answers);
+  if (missing.length) {
+    // GOV.UK pattern: summary at the top, focus moved to it, and spoken.
+    text = showErrorSummary(missing, changeField);
+    announce(text, { assertive: true });
+  }
   speak(`${prefix ? prefix + " " : ""}${text}`, { onend: thenListen(onSpokenReview) });
 }
 
@@ -383,6 +444,8 @@ function onSpokenReview(text) {
     if (id) { reviewMisses = 0; return changeField(id); }
     return say("Which answer would you like to change? For example, say change date of birth.", { then: thenListen(onSpokenReview) });
   }
+  const missing = missingRequired(answers);
+  if (missing.length && isYes(text)) { reviewMisses = 0; return changeField(missing[0].id); }
   if (isYes(text)) { reviewMisses = 0; return trySubmit(); }
   reviewMisses++;
   say("Say submit to send your request, or change and the question to edit an answer.",
@@ -391,15 +454,8 @@ function onSpokenReview(text) {
 
 function trySubmit() {
   cancelListening();
-  const missing = missingRequired(answers);
-  if (missing.length) {
-    // Shouldn't happen with per-question validation, but never submit blanks.
-    const field = missing[0];
-    state.returnToReview = true;
-    showQuestion(fields.indexOf(field), { prefix: `Your ${field.label.toLowerCase()} is missing.` });
-    showFieldError(field.id, `Enter your ${field.label.toLowerCase()}.`);
-    return;
-  }
+  // Never submit with a required answer missing: show and speak the error summary.
+  if (missingRequired(answers).length) return showReview();
   state.mode = "done";
   say(submit(answers));
 }
@@ -419,8 +475,10 @@ export function startAccessibleMode() {
   wireForm();
   for (const k of Object.keys(answers)) delete answers[k];
   state.returnToReview = false;
+  state.pendingMulti = null;
+  const oneGo = ai.ready ? " Or, if you like, tell me everything in one go." : "";
   showQuestion(0, {
-    prefix: `Accessible mode on. Booking an appointment. I'll ask ${fields.length} questions, one at a time. You can speak or type each answer, and say back, repeat, or skip at any time.`,
+    prefix: `Accessible mode on. Booking an appointment. I'll ask ${fields.length} questions, one at a time. You can speak or type each answer, and say back, repeat, or skip at any time.${oneGo}`,
   });
 }
 
@@ -555,6 +613,6 @@ init();
 // clearform.hear("next Tuesday") simulates a spoken answer for testing.
 const handlers = () => ({ question: onSpokenAnswer, confirm: onSpokenConfirm, review: onSpokenReview });
 window.clearform = {
-  startAccessibleMode, answers, state, spokenValue,
+  startAccessibleMode, answers, state, spokenValue, checkAi, ai,
   hear: (text) => { cancelListening(); handlers()[state.mode]?.(text); },
 };

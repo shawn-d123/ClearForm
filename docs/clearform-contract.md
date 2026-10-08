@@ -87,7 +87,9 @@ POST /api/transcribe
   body: { audioBase64, mimeType? }        ->  { text }
 
 POST /api/extract
-  body: { fields, transcript, today }     ->  { values: { fieldId: value } }
+  body: { fields, transcript, today, currentFieldId? }  ->  { values: { fieldId: value } }
+    currentFieldId (optional, added Phase 4): the question just asked, so a
+    bare answer maps to it; other fields fill only when clearly stated.
     dates normalised to YYYY-MM-DD, choices mapped to allowed options,
     only confident fields returned.
 ```
@@ -123,7 +125,7 @@ export function setRate(r);
 export function recordAnswer();           // -> Promise<audioBase64>
 export function stopRecording();
 export function transcribe(audioBase64, mimeType);   // -> Promise<text>   (calls /api/transcribe)
-export function extract(transcript, today);          // -> Promise<values> (calls /api/extract)
+export function extract(transcript, today, fieldList?, currentFieldId?); // -> Promise<values> (calls /api/extract)
 export function listenFallback();         // -> Promise<text> (on-device, no network)
 export function onVoiceTrigger(phrase, cb);          // fires cb when phrase heard
 ```
