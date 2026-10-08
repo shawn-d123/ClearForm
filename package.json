@@ -1,0 +1,14 @@
+{
+  "name": "clearform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ClearForm: an accessible, voice-driven appointment form (hackathon demo).",
+  "scripts": {
+    "dev": "npx --yes serve -l 3000 .",
+    "test": "node test/normalize.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,276 @@
+/* ClearForm. Accessible side: high contrast (all text at least 7:1 except
+   the header, 5.9:1 white on blue), large type, a thick visible focus
+   indicator, and never colour alone. Generic NHS-style layout, no NHS branding. */
+
+:root {
+  --text: #0b0c0c;
+  --secondary-text: #383f43;
+  --bg: #ffffff;
+  --page: #f0f4f5;
+  --blue: #005eb8;
+  --blue-dark: #003d78;
+  --green: #00703c;
+  --green-dark: #004e2a;
+  --red: #b10e1e;
+  --focus: #ffdd00;
+  --border: #4c6272;
+  --radius: 4px;
+  --max: 46rem;
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 112.5%; } /* 18px base */
+
+body {
+  margin: 0;
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--page);
+  -webkit-font-smoothing: antialiased;
+}
+
+.container {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+main { padding-top: 1.5rem; padding-bottom: 4rem; }
+main:focus { outline: none; }
+
+h1 { font-size: 2.25rem; line-height: 1.15; margin: 0 0 1.25rem; font-weight: 700; }
+h2 { font-size: 1.5rem; line-height: 1.2; margin: 2rem 0 0.75rem; }
+p { margin: 0 0 1.25rem; }
+.lead { font-size: 1.3rem; }
+
+/* Focus: yellow fill with a black bar, visible on every background. */
+:focus-visible {
+  outline: 4px solid var(--focus);
+  outline-offset: 0;
+  box-shadow: 0 0 0 8px var(--text);
+}
+h1:focus, h1:focus-visible { outline: none; box-shadow: none; }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem; top: -100px;
+  background: var(--focus);
+  color: var(--text);
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  z-index: 10;
+}
+.skip-link:focus { top: 0.5rem; }
+
+/* Header */
+.site-header { background: var(--blue); color: #fff; }
+.header-inner { display: flex; align-items: center; gap: 0.75rem; padding-top: 1rem; padding-bottom: 1rem; }
+.logo {
+  display: inline-grid; place-items: center;
+  width: 2.6rem; height: 2.6rem;
+  border: 3px solid #fff; border-radius: var(--radius);
+  font-weight: 700; letter-spacing: 0.02em;
+}
+.service-name { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+.service-sub { display: block; font-size: 1rem; font-weight: 400; }
+
+.phase-banner p { margin: 0; padding: 0.75rem 0; border-bottom: 1px solid #b1b4b6; font-size: 0.95rem; }
+.tag {
+  display: inline-block; margin-right: 0.5rem; padding: 0.1rem 0.5rem;
+  background: var(--blue); color: #fff; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+/* Screens are white cards */
+.screen {
+  background: var(--bg);
+  padding: 1.75rem 1.5rem 2rem;
+  border-radius: var(--radius);
+  margin-top: 1rem;
+}
+@media (min-width: 40rem) { .screen { padding: 2.5rem 2.5rem 2.5rem; } }
+
+/* Buttons */
+.button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem;
+  min-height: 3.25rem;
+  padding: 0.7rem 1.4rem;
+  font: inherit; font-size: 1.15rem; font-weight: 700;
+  color: #fff; background: var(--green);
+  border: 2px solid transparent; border-radius: var(--radius);
+  box-shadow: 0 4px 0 var(--green-dark);
+  cursor: pointer;
+}
+.button:hover { background: var(--green-dark); }
+.button:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--green-dark); }
+.button:focus-visible { background: var(--focus); color: var(--text); box-shadow: 0 4px 0 var(--text); outline: none; }
+
+.button--secondary { background: #fff; color: var(--text); border-color: var(--text); box-shadow: 0 4px 0 var(--text); }
+.button--secondary:hover { background: #e8edee; }
+
+.button--voice { background: var(--blue); box-shadow: 0 4px 0 var(--blue-dark); }
+.button--voice:hover { background: var(--blue-dark); }
+.button--voice.is-listening { background: var(--red); box-shadow: 0 4px 0 #6f0a13; }
+
+.button--start { font-size: 1.35rem; padding: 0.9rem 1.8rem; }
+.button--start::after { content: "\2192"; font-size: 1.4rem; }
+
+.button--small { min-height: 2.6rem; padding: 0.35rem 0.9rem; font-size: 0.95rem; }
+.button[aria-pressed="false"] { background: #fff; color: var(--secondary-text); border-style: dashed; }
+.button[aria-pressed="true"]::before { content: "\2713"; }
+.button[aria-pressed="false"]::before { content: "\2715"; }
+
+.mic {
+  width: 0.85rem; height: 1.25rem; border: 3px solid currentColor; border-radius: 1rem;
+  position: relative; display: inline-block;
+}
+.mic::after {
+  content: ""; position: absolute; left: 50%; bottom: -0.55rem; width: 3px; height: 0.4rem;
+  background: currentColor; transform: translateX(-50%);
+}
+
+.link-button {
+  font: inherit; color: var(--blue); background: none; border: 0; padding: 0.25rem;
+  text-decoration: underline; text-underline-offset: 0.15em; cursor: pointer;
+}
+.link-button:hover { color: var(--blue-dark); text-decoration-thickness: 3px; }
+.link-button:focus-visible { background: var(--focus); color: var(--text); outline: none; box-shadow: 0 4px 0 var(--text); text-decoration: none; }
+
+.back-link {
+  font: inherit; font-size: 1.05rem; background: none; border: 0; padding: 0.5rem 0.25rem 0.5rem 1rem;
+  color: var(--text); text-decoration: underline; cursor: pointer; position: relative;
+}
+.back-link::before {
+  content: ""; position: absolute; left: 0.1rem; top: 50%; width: 0.5rem; height: 0.5rem;
+  border-left: 3px solid currentColor; border-bottom: 3px solid currentColor;
+  transform: translateY(-50%) rotate(45deg);
+}
+.back-link:focus-visible { background: var(--focus); outline: none; box-shadow: 0 4px 0 var(--text); text-decoration: none; }
+.back-link[hidden] { display: none; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 1rem 1.25rem; margin: 2rem 0 1rem; }
+.help { color: var(--secondary-text); font-size: 1rem; }
+
+/* Relay controls */
+.controls {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+.controls-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-left: auto; }
+.speed { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.95rem; }
+.speed select {
+  font: inherit; min-height: 2.6rem; padding: 0.25rem 0.5rem;
+  border: 2px solid var(--text); border-radius: var(--radius); background: #fff; color: var(--text);
+}
+
+/* Questions: large and high contrast */
+.step-count { color: var(--secondary-text); font-size: 1.15rem; margin-bottom: 0.5rem; }
+.question-heading { margin: 0 0 0.75rem; }
+.question { display: block; font-size: 2.5rem; line-height: 1.12; font-weight: 700; }
+@media (min-width: 40rem) { .question { font-size: 3rem; } }
+.question-legend { padding: 0; margin-bottom: 0; }
+.hint { color: var(--secondary-text); font-size: 1.2rem; margin-bottom: 1.25rem; }
+
+.fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+
+.input {
+  display: block; width: 100%;
+  font: inherit; font-size: 1.6rem;
+  padding: 0.6rem 0.8rem; min-height: 3.75rem;
+  color: var(--text); background: #fff;
+  border: 3px solid var(--text); border-radius: 0;
+}
+.input:focus-visible { outline: 4px solid var(--focus); outline-offset: 0; box-shadow: inset 0 0 0 2px var(--text); }
+
+.radios { display: grid; gap: 0.9rem; }
+.radio { position: relative; }
+.radio-input {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; margin: 0;
+  opacity: 0; cursor: pointer;
+}
+.radio-label {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1rem 1.25rem; min-height: 4rem;
+  font-size: 1.6rem; font-weight: 700;
+  border: 3px solid var(--text); border-radius: var(--radius); background: #fff;
+  cursor: pointer;
+}
+.radio-label::before {
+  content: ""; flex: none; width: 2rem; height: 2rem; border: 3px solid var(--text); border-radius: 50%;
+  background: #fff;
+}
+.radio-input:checked + .radio-label { background: #e8f1fa; }
+.radio-input:checked + .radio-label::before { background: radial-gradient(circle, var(--text) 0 45%, #fff 50%); }
+.radio-input:checked + .radio-label::after { content: "Selected"; margin-left: auto; font-size: 1rem; font-weight: 400; }
+.radio-input:focus-visible + .radio-label { outline: 4px solid var(--focus); outline-offset: 0; box-shadow: 0 0 0 8px var(--text); }
+
+/* Errors: text plus a thick bar, never colour alone */
+.field--error { border-left: 6px solid var(--red); padding-left: 1rem; }
+.field--error .input { border-color: var(--red); }
+.error-message { color: var(--red); font-size: 1.2rem; font-weight: 700; margin-bottom: 0.75rem; }
+.error-message::before { content: "\26A0\FE0E  "; }
+
+.error-summary { border: 5px solid var(--red); padding: 1.25rem; margin-bottom: 2rem; }
+.error-summary:focus { outline: 4px solid var(--focus); }
+.error-summary-title { margin-top: 0; }
+
+/* Confirm */
+.confirm-heading { margin-bottom: 0.5rem; }
+.confirm-label { display: block; font-size: 1.35rem; font-weight: 400; color: var(--secondary-text); margin-bottom: 0.25rem; }
+.confirm-value {
+  display: block; font-size: 2.75rem; line-height: 1.15; margin-bottom: 1rem;
+  padding: 0.75rem 1rem; border-left: 8px solid var(--blue); background: #f0f4f5; overflow-wrap: anywhere;
+}
+.confirm-question { display: block; font-size: 2rem; }
+
+/* Summary list (check answers) */
+.summary-list { margin: 0 0 2rem; font-size: 1.15rem; }
+.summary-row { display: grid; grid-template-columns: 1fr; gap: 0.25rem; padding: 0.9rem 0; border-bottom: 1px solid #b1b4b6; }
+@media (min-width: 40rem) { .summary-row { grid-template-columns: 30% 1fr auto; gap: 1rem; } }
+.summary-row dt { font-weight: 700; }
+.summary-row dd { margin: 0; overflow-wrap: anywhere; }
+.summary-empty { color: var(--secondary-text); font-style: italic; }
+.summary-action { text-align: left; }
+
+/* Done */
+.panel { background: var(--green); color: #fff; text-align: center; padding: 2rem 1.5rem; margin-bottom: 1.5rem; }
+.panel h1 { font-size: 2.5rem; }
+.panel-body { font-size: 1.5rem; margin: 0; }
+.panel-body strong { font-size: 2rem; letter-spacing: 0.04em; }
+
+/* Listening indicator: text plus a shape, not colour alone */
+.listening {
+  position: sticky; bottom: 1rem; margin: 1rem 0 0;
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.9rem 1.25rem; background: var(--text); color: #fff;
+  font-size: 1.25rem; font-weight: 700; border-radius: var(--radius);
+}
+.listening[hidden] { display: none; }
+.pulse { width: 1rem; height: 1rem; border-radius: 50%; background: #fff; animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.5); opacity: 0.5; } }
+
+[hidden] { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Windows high contrast / forced colours */
+@media (forced-colors: active) {
+  .button, .radio-label, .input { border: 2px solid ButtonText; }
+  .radio-input:checked + .radio-label { outline: 3px solid Highlight; }
+  :focus-visible { outline: 3px solid Highlight; }
+}

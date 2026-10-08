@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Book an appointment – ClearForm</title>
+  <meta name="description" content="ClearForm: an accessible, voice-driven appointment booking form. Demonstration only, with invented data.">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <span class="logo" aria-hidden="true">CF</span>
+      <span class="service-name">ClearForm Surgery <span class="service-sub">Book an appointment</span></span>
+    </div>
+  </header>
+
+  <div class="phase-banner container">
+    <p><strong class="tag">Demo</strong> This is a hackathon demonstration with invented data. It does not book real appointments.</p>
+  </div>
+
+  <main id="main" class="container" tabindex="-1">
+
+    <!-- Start screen. The tap on Start also unlocks audio in the browser. -->
+    <section id="start-screen" class="screen" aria-labelledby="start-heading">
+      <h1 id="start-heading">Book an appointment</h1>
+      <p class="lead">Answer 7 short questions, one at a time. Each question is read aloud. You can answer by speaking or by typing, and every answer is read back to you before you move on.</p>
+      <p>Before anything is sent, you will hear all of your answers and can change any of them.</p>
+      <button type="button" id="start-btn" class="button button--start">Start now</button>
+    </section>
+
+    <!-- The accessible relay: one question per screen. -->
+    <section id="relay" class="relay" hidden aria-label="Appointment booking, one question at a time">
+
+      <div class="controls" role="group" aria-label="Voice settings">
+        <button type="button" id="back-btn" class="back-link">Back<span class="visually-hidden"> to previous question</span></button>
+        <div class="controls-right">
+          <button type="button" id="repeat-btn" class="button button--small button--secondary">Repeat</button>
+          <button type="button" id="voice-toggle" class="button button--small button--secondary" aria-pressed="true">Read aloud</button>
+          <button type="button" id="handsfree-toggle" class="button button--small button--secondary" aria-pressed="true">Listen automatically</button>
+          <label class="speed">
+            <span>Speech speed</span>
+            <select id="speed-select">
+              <option value="0.75">Slow</option>
+              <option value="0.95" selected>Normal</option>
+              <option value="1.2">Fast</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <!-- Question screen: the accessible form renders its steps in here. -->
+      <div id="question-screen" class="screen">
+        <div id="form-host"></div>
+        <div class="actions">
+          <button type="submit" form="accessible-form" id="continue-btn" class="button">Continue</button>
+          <button type="button" id="speak-btn" class="button button--voice" aria-describedby="speak-help">
+            <span class="mic" aria-hidden="true"></span><span class="speak-label">Speak answer</span>
+          </button>
+          <button type="button" id="skip-btn" class="button button--secondary" hidden>Skip this question</button>
+        </div>
+        <p id="speak-help" class="help">Say your answer after the question. You can also say “repeat”, “back” or “skip”.</p>
+        <p id="no-mic-help" class="help" hidden>Speaking your answer is not available in this browser. Please type your answer.</p>
+      </div>
+
+      <!-- Confirm screen: the captured answer read back before moving on. -->
+      <div id="confirm-screen" class="screen" hidden>
+        <p class="step-count" id="confirm-count"></p>
+        <h1 id="confirm-heading" class="confirm-heading" tabindex="-1">
+          <span class="confirm-label" id="confirm-label"></span>
+          <span class="confirm-value" id="confirm-value"></span>
+          <span class="confirm-question">Is this right?</span>
+        </h1>
+        <div class="actions">
+          <button type="button" id="confirm-yes" class="button">Yes, continue</button>
+          <button type="button" id="confirm-no" class="button button--secondary">No, change it</button>
+        </div>
+        <p class="help">You can also say “yes” or “no”.</p>
+      </div>
+
+      <!-- Review screen: the whole form read back before submit. -->
+      <div id="review-screen" class="screen" hidden>
+        <h1 id="review-heading" tabindex="-1">Check your answers before sending</h1>
+        <div id="error-summary" class="error-summary" hidden tabindex="-1" aria-labelledby="error-summary-title">
+          <h2 id="error-summary-title" class="error-summary-title">There is a problem</h2>
+          <ul id="error-summary-list"></ul>
+        </div>
+        <dl id="summary-list" class="summary-list"></dl>
+        <h2>Send your request</h2>
+        <p>By sending this request you confirm the details above are correct.</p>
+        <div class="actions">
+          <button type="button" id="submit-btn" class="button">Confirm and send</button>
+        </div>
+        <p class="help">You can also say “submit”, or “change” and the question, like “change date of birth”.</p>
+      </div>
+
+      <!-- Done screen. -->
+      <div id="done-screen" class="screen" hidden>
+        <div class="panel">
+          <h1 id="done-heading" tabindex="-1">Appointment request sent</h1>
+          <p class="panel-body">Your reference number<br><strong id="done-ref"></strong></p>
+        </div>
+        <p>We will contact you to confirm the time of your appointment. This is a demonstration, so nothing has really been sent.</p>
+        <button type="button" id="restart-btn" class="button button--secondary">Start a new booking</button>
+      </div>
+
+      <p id="listening" class="listening" hidden><span class="pulse" aria-hidden="true"></span> Listening… speak now</p>
+    </section>
+  </main>
+
+  <!-- Live regions. They exist from page load so changes are announced. -->
+  <div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="sr-alert" class="visually-hidden" role="alert" aria-live="assertive" aria-atomic="true"></div>
+</body>
+</html>
