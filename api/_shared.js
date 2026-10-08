@@ -18,3 +18,12 @@ export function sameOrigin(req) {
 export function hasKey() {
   return Boolean(process.env.OPENAI_API_KEY);
 }
+
+/**
+ * Why an OpenAI call failed, safe to return to the browser: the HTTP status
+ * and OpenAI's error code (e.g. invalid_api_key, insufficient_quota). Never
+ * the message, which can echo part of the key.
+ */
+export function upstreamReason(err) {
+  return { upstreamStatus: err?.status ?? null, upstreamCode: err?.code ?? err?.error?.code ?? null };
+}

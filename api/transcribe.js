@@ -2,7 +2,7 @@
 // Audio in, Whisper, text out. The key is read here and never leaves the server.
 
 import OpenAI, { toFile } from "openai";
-import { sameOrigin, hasKey } from "./_shared.js";
+import { sameOrigin, hasKey, upstreamReason } from "./_shared.js";
 
 const MAX_BASE64 = 3_000_000; // ~2 MB of audio; answers are a few seconds
 
@@ -38,6 +38,6 @@ export default async function handler(req, res) {
     res.status(200).json({ text: (result.text || "").trim() });
   } catch (err) {
     console.error("transcribe error", err?.status, err?.message);
-    res.status(502).json({ error: "Transcription failed" });
+    res.status(502).json({ error: "Transcription failed", ...upstreamReason(err) });
   }
 }

@@ -6,7 +6,7 @@
 // before it is returned, so the client never receives an invalid choice or date.
 
 import OpenAI from "openai";
-import { sameOrigin, hasKey } from "./_shared.js";
+import { sameOrigin, hasKey, upstreamReason } from "./_shared.js";
 
 const SYSTEM = `You map a user's spoken words onto fields of an appointment booking form.
 Return JSON only, shaped { "values": { "<fieldId>": "<value>" } }.
@@ -85,6 +85,6 @@ export default async function handler(req, res) {
     res.status(200).json({ values: clean(parsed.values, slimFields) });
   } catch (err) {
     console.error("extract error", err?.status, err?.message);
-    res.status(502).json({ error: "Extraction failed" });
+    res.status(502).json({ error: "Extraction failed", ...upstreamReason(err) });
   }
 }
