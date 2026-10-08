@@ -15,6 +15,6 @@ const ch = [["I'd like to see a doctor", ["GP","Nurse","Blood test"], "GP"], ["b
   ["the nurse", ["GP","Nurse","Blood test"], "Nurse"], ["morning please", ["Morning","Afternoon"], "Morning"], ["second", ["Morning","Afternoon"], "Afternoon"], ["pizza", ["Morning","Afternoon"], null]];
 for (const [i, o, want] of ch) { const got = matchChoice(i, o); if (got !== want) { fail++; console.log("FAIL choice", i, got, want); } }
 const misc = [[tidyNhsNumber("485 777 3456"), "485 777 3456"], [tidyNhsNumber("four eight five 7773456"), "485 777 3456"], [tidyNhsNumber("123"), null],
-  [tidyName("my name is jane smith"), "Jane Smith"], [tidyName("Mary O'Brien-Jones"), "Mary O'Brien-Jones"], [isYes("yes that's right"), true], [isYes("no"), false], [isNo("no change it"), true], [commandIn("Go back."), "back"], [commandIn("skip"), "skip"]];
+  [tidyName("my name is jane smith"), "Jane Smith"], [tidyName("Mary O'Brien-Jones"), "Mary O'Brien-Jones"], [tidyName("Jane Smith."), "Jane Smith"], [isYes("yes that's right"), true], [isYes("no"), false], [isNo("no change it"), true], [commandIn("Go back."), "back"], [commandIn("skip"), "skip"]];
 misc.forEach(([g, w], i) => { if (g !== w) { fail++; console.log("FAIL misc", i, g, w); } });
 console.log(fail ? `${fail} failures` : "all normalize tests pass");

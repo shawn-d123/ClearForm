@@ -193,7 +193,8 @@ export function matchChoice(input, options) {
 // --- text fields -----------------------------------------------------------
 
 export function tidyText(input) {
-  return String(input || "").replace(/\s+/g, " ").trim();
+  // Whisper punctuates ("Jane Smith."); a form value shouldn't end in a full stop.
+  return String(input || "").replace(/\s+/g, " ").trim().replace(/[\s.,!?;:]+$/, "");
 }
 
 export function tidyName(input) {

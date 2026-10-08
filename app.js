@@ -10,6 +10,8 @@ import {
 import {
   speak, stopSpeaking, repeatLast, setRate, setMuted, isMuted,
   listenFallback, stopListening, canListen, onVoiceTrigger,
+  canRecord, recordAnswer, stopRecording, cancelRecording, isRecording, releaseMic,
+  transcribe, extract, aiReady, startThinking, stopThinking,
 } from "./voice.js";
 import {
   parseDate, matchChoice, tidyName, tidyText, tidyNhsNumber,
@@ -30,12 +32,22 @@ function todayIso() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// Voice is available if we can either record for Whisper or use on-device recognition.
+const canVoice = canListen || canRecord;
+
+// The AI path (Whisper + extraction). ?ai=off forces the on-device fallback,
+// for rehearsing a dead connection.
+const ai = {
+  ready: false,
+  forcedOff: new URLSearchParams(location.search).get("ai") === "off",
+};
+
 const state = {
   mode: "start",        // start | question | confirm | review | done
   index: 0,             // current field
   pending: null,        // value awaiting confirmation
   viaVoice: false,      // was the pending value spoken?
-  handsFree: canListen, // listen automatically after each prompt
+  handsFree: canVoice,  // listen automatically after each prompt
   typedThisStep: false, // user started typing, so don't open the mic
   misses: 0,            // consecutive misunderstood answers
   returnToReview: false,
@@ -82,38 +94,91 @@ function interpret(field, raw) {
   return { value: text };
 }
 
+// --- the AI path and its fallback ---------------------------------------------
+
+async function checkAi() {
+  ai.ready = !ai.forcedOff && canRecord && (await aiReady());
+  updateVoiceStatus();
+}
+
+/** The API or network failed mid-answer: use on-device speech, retry the API later. */
+function aiLost() {
+  if (!ai.ready) return;
+  ai.ready = false;
+  updateVoiceStatus();
+  setTimeout(checkAi, 30000);
+}
+
+function updateVoiceStatus() {
+  const el = $("voice-mode");
+  if (!el) return;
+  el.textContent = ai.ready ? "Voice input: enhanced (online)"
+    : canListen ? "Voice input: on-device"
+    : "Voice input is not available in this browser, please type.";
+}
+
 // --- listening ---------------------------------------------------------------
 
-let listenHandler = null;
+let listenToken = 0;
 
-function setListeningUI(on) {
-  $("listening").hidden = !on;
+function setListeningUI(phase) { // "listening" | "thinking" | null
+  const box = $("listening");
+  box.hidden = !phase;
+  box.querySelector(".listening-text").textContent =
+    phase === "thinking" ? "Working it out…" : "Listening… speak now";
+  box.classList.toggle("is-thinking", phase === "thinking");
   const btn = $("speak-btn");
-  btn.classList.toggle("is-listening", on);
-  btn.querySelector(".speak-label").textContent = on ? "Stop listening" : "Speak answer";
+  btn.classList.toggle("is-listening", phase === "listening");
+  btn.querySelector(".speak-label").textContent =
+    phase === "listening" ? (ai.ready ? "Done speaking" : "Stop listening") : "Speak answer";
+}
+
+/** Capture one utterance as text: Whisper when online, on-device otherwise. */
+async function captureSpeech() {
+  if (ai.ready) {
+    const audio = await recordAnswer(); // no-speech / aborted / not-allowed propagate
+    setListeningUI("thinking");
+    startThinking();
+    try {
+      return await transcribe(audio);
+    } catch (e) {
+      aiLost();
+      const err = new Error("AI path failed");
+      err.code = "ai-failed";
+      throw err;
+    } finally {
+      stopThinking();
+    }
+  }
+  return listenFallback();
 }
 
 /** Listen once and pass the transcript to handler. */
 function listen(handler) {
-  if (!canListen) return;
+  if (!canVoice || (!ai.ready && !canListen)) return;
   stopSpeaking();
-  listenHandler = handler;
-  setListeningUI(true);
+  const token = ++listenToken;
+  setListeningUI("listening");
   announce("Listening.");
-  listenFallback()
+  captureSpeech()
     .then((text) => {
-      setListeningUI(false);
-      if (listenHandler === handler) handler(text);
+      if (token !== listenToken) return;
+      setListeningUI(null);
+      if (!text) return say("I didn't hear anything. Press Speak answer to try again, or type your answer.");
+      handler(text);
     })
     .catch((err) => {
-      setListeningUI(false);
-      if (err.code === "aborted" || listenHandler !== handler) return;
-      if (err.code === "not-allowed" || err.code === "service-not-allowed") {
+      if (token !== listenToken) return;
+      setListeningUI(null);
+      if (err.code === "aborted") return;
+      if (err.code === "not-allowed" || err.code === "service-not-allowed" || err.code === "no-mic") {
         state.handsFree = false;
         updateToggles();
         say("I can't use the microphone. Please allow microphone access, or type your answer.");
       } else if (err.code === "no-speech") {
         say("I didn't hear anything. Press Speak answer to try again, or type your answer.");
+      } else if (err.code === "ai-failed" && canListen) {
+        say("Sorry, I lost my connection. Please say that again.", { then: () => listen(handler) });
       } else {
         say("Sorry, voice input isn't working right now. Please type your answer.");
       }
@@ -121,9 +186,11 @@ function listen(handler) {
 }
 
 function cancelListening() {
-  listenHandler = null;
+  listenToken++;
   stopListening();
-  setListeningUI(false);
+  cancelRecording();
+  stopThinking();
+  setListeningUI(null);
 }
 
 /** Speak and mirror into the live region, then optionally listen. */
@@ -165,14 +232,35 @@ function showQuestion(index, { prefix = "", keepValue = false } = {}) {
   speak(text, { onend: thenListen(onSpokenAnswer) });
 }
 
-function onSpokenAnswer(text) {
+async function onSpokenAnswer(text) {
   const field = current();
   const cmd = commandIn(text);
   if (cmd) return runCommand(cmd);
 
   // Show what was heard in the field, so the screen matches the speech.
   if (field.type !== "choice") $(`f-${field.id}`).value = text;
-  takeAnswer(text, true);
+
+  // Online: the model maps messy speech to a clean value for this field.
+  // It returns nothing when unsure, and then on-device parsing takes over.
+  let raw = text;
+  if (ai.ready) {
+    const index = state.index;
+    const token = ++listenToken;
+    setListeningUI("thinking");
+    startThinking();
+    try {
+      const values = await extract(text, todayIso(), [field]);
+      if (values[field.id]) raw = values[field.id];
+    } catch {
+      // Fall through to on-device parsing of the raw transcript.
+    } finally {
+      stopThinking();
+    }
+    // The user may have typed, gone back or cancelled while we waited.
+    if (token !== listenToken || state.mode !== "question" || state.index !== index) return;
+    setListeningUI(null);
+  }
+  takeAnswer(raw, true);
 }
 
 function takeAnswer(raw, viaVoice) {
@@ -335,6 +423,7 @@ export function startAccessibleMode() {
 function exitAccessibleMode() {
   cancelListening();
   stopSpeaking();
+  releaseMic();
   state.mode = "start";
   document.body.classList.remove("relay-active");
   $("accessible-view").hidden = true;
@@ -396,16 +485,19 @@ function wireForm() {
 function updateToggles() {
   $("voice-toggle").setAttribute("aria-pressed", String(!isMuted()));
   $("handsfree-toggle").setAttribute("aria-pressed", String(state.handsFree));
-  $("handsfree-toggle").hidden = !canListen;
+  $("handsfree-toggle").hidden = !canVoice;
 }
 
 function init() {
   renderBrokenForm($("broken-view"));
   $("a11y-btn").addEventListener("click", startAccessibleMode);
   $("exit-btn").addEventListener("click", exitAccessibleMode);
+  checkAi();
+  window.addEventListener("online", checkAi);
+  window.addEventListener("offline", () => { ai.ready = false; updateVoiceStatus(); });
   armVoiceTriggerOnFirstGesture();
 
-  if (!canListen) {
+  if (!canVoice) {
     $("speak-btn").hidden = true;
     $("speak-help").hidden = true;
     $("no-mic-help").hidden = false;
@@ -414,6 +506,7 @@ function init() {
   updateToggles();
 
   $("speak-btn").addEventListener("click", () => {
+    if (isRecording()) return stopRecording(); // "Done speaking": send it now
     if (!$("listening").hidden) return cancelListening();
     state.typedThisStep = false;
     listen(onSpokenAnswer);

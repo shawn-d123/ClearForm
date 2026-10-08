@@ -1,6 +1,9 @@
-// Voice in and voice out. Phase 1 uses only browser APIs: speechSynthesis for
-// speaking and SpeechRecognition for listening. Phase 3 adds Whisper and the
-// extraction model behind /api, with listenFallback() kept as the offline path.
+// Voice in and voice out. Speech out is the browser's speechSynthesis.
+// Speech in is MediaRecorder -> /api/transcribe (Whisper) -> /api/extract,
+// with the browser's on-device SpeechRecognition (listenFallback) as the
+// offline path when the API or the network is unavailable.
+
+import { fields as allFields } from "./form-schema.js";
 
 const synth = typeof window !== "undefined" ? window.speechSynthesis : null;
 const Recognition = typeof window !== "undefined"
@@ -238,4 +241,234 @@ export function onVoiceTrigger(phrase, cb, { onstate } = {}) {
 
   start();
   return stop;
+}
+
+// --- recording for Whisper -----------------------------------------------------
+
+export const canRecord = typeof window !== "undefined" &&
+  Boolean(window.MediaRecorder && navigator.mediaDevices?.getUserMedia);
+
+let micStream = null;
+let audioCtx = null;
+let recording = null; // { stop(), cancel() }
+let lastMimeType = "audio/webm";
+
+async function getMic() {
+  if (micStream && micStream.getTracks().some((t) => t.readyState === "live")) return micStream;
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  });
+  return micStream;
+}
+
+/** Turn the microphone off completely (e.g. when leaving accessible mode). */
+export function releaseMic() {
+  cancelRecording();
+  micStream?.getTracks().forEach((t) => t.stop());
+  micStream = null;
+}
+
+function pickMimeType() {
+  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+  return types.find((t) => MediaRecorder.isTypeSupported?.(t)) || "";
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onloadend = () => resolve(String(r.result).split(",")[1] || "");
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
+function codedError(message, code) {
+  const err = new Error(message);
+  err.code = code;
+  return err;
+}
+
+/**
+ * Record one answer. Stops by itself after a short silence once speech has
+ * started, or when stopRecording() is called (a tap), with a time limit as
+ * the backstop. Resolves with base64 audio; recordingMimeType() gives its type.
+ * Rejects with .code "no-speech", "aborted" or "not-allowed".
+ */
+export async function recordAnswer({ silenceMs = 1300, noSpeechMs = 7000, maxMs = 12000 } = {}) {
+  cancelRecording();
+  let stream;
+  try {
+    stream = await getMic();
+  } catch (e) {
+    throw codedError("Microphone blocked", e.name === "NotAllowedError" ? "not-allowed" : "no-mic");
+  }
+
+  const mimeType = pickMimeType();
+  const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  lastMimeType = (rec.mimeType || mimeType || "audio/webm").split(";")[0];
+  const chunks = [];
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+
+  // Simple voice activity detection on the input level.
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") await audioCtx.resume().catch(() => {});
+  const source = audioCtx.createMediaStreamSource(stream);
+  const analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 1024;
+  source.connect(analyser);
+  const buf = new Float32Array(analyser.fftSize);
+
+  return new Promise((resolve, reject) => {
+    const started = performance.now();
+    let heardSpeech = false;
+    let loudFor = 0;
+    let lastLoud = 0;
+    let noise = 0.01;
+    let outcome = null; // "done" | "cancel" | "no-speech"
+
+    const tick = setInterval(() => {
+      analyser.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      const rms = Math.sqrt(sum / buf.length);
+      const now = performance.now();
+      const threshold = Math.max(0.015, noise * 2.5);
+      if (rms > threshold) {
+        loudFor += 50;
+        lastLoud = now;
+        if (loudFor >= 150) heardSpeech = true;
+      } else {
+        loudFor = 0;
+        if (!heardSpeech) noise = noise * 0.9 + rms * 0.1; // learn the room
+      }
+      if (heardSpeech && now - lastLoud > silenceMs) finish("done");
+      else if (!heardSpeech && now - started > noSpeechMs) finish("no-speech");
+      else if (now - started > maxMs) finish("done");
+    }, 50);
+
+    function finish(how) {
+      if (outcome) return;
+      outcome = how;
+      clearInterval(tick);
+      source.disconnect();
+      recording = null;
+      if (rec.state !== "inactive") rec.stop(); else onStopped();
+    }
+
+    async function onStopped() {
+      if (outcome === "cancel") return reject(codedError("Recording cancelled", "aborted"));
+      if (outcome === "no-speech" && !heardSpeech) return reject(codedError("No speech was heard.", "no-speech"));
+      const blob = new Blob(chunks, { type: lastMimeType });
+      if (blob.size < 1500) return reject(codedError("No speech was heard.", "no-speech"));
+      resolve(await blobToBase64(blob));
+    }
+    rec.onstop = onStopped;
+
+    recording = {
+      // A tap means "I've finished": send what we have, even if quiet.
+      stop: () => { heardSpeech = true; finish("done"); },
+      cancel: () => finish("cancel"),
+    };
+    rec.start(250);
+  });
+}
+
+export function stopRecording() {
+  recording?.stop();
+}
+
+export function cancelRecording() {
+  recording?.cancel();
+}
+
+export function isRecording() {
+  return Boolean(recording);
+}
+
+export function recordingMimeType() {
+  return lastMimeType;
+}
+
+// --- the AI endpoints --------------------------------------------------------
+
+async function postJson(url, body, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    if (!r.ok) throw codedError(`${url} failed with ${r.status}`, "api-failed");
+    return await r.json();
+  } catch (e) {
+    throw e.code ? e : codedError(e.message || "Network error", "api-failed");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Audio to text via /api/transcribe (Whisper). */
+export async function transcribe(audioBase64, mimeType = lastMimeType) {
+  const { text } = await postJson("/api/transcribe", { audioBase64, mimeType }, 12000);
+  return (text || "").trim();
+}
+
+/** Transcript to { fieldId: value } via /api/extract. fieldList defaults to the whole form. */
+export async function extract(transcript, today, fieldList = allFields) {
+  const { values } = await postJson("/api/extract", { fields: fieldList, transcript, today }, 9000);
+  return values || {};
+}
+
+/** Is the AI path configured and reachable? */
+export async function aiReady() {
+  if (!navigator.onLine) return false;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 3500);
+  try {
+    const r = await fetch("/api/extract", { method: "GET", signal: ctrl.signal, cache: "no-store" });
+    if (!r.ok) return false;
+    return Boolean((await r.json()).ready);
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// --- thinking cue --------------------------------------------------------------
+
+let thinkingTimer = null;
+
+/** A soft, quiet two-note cue every second while the AI works, so it's never dead air. */
+export function startThinking() {
+  stopThinking();
+  if (muted) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const blip = () => {
+      const t = audioCtx.currentTime;
+      [0, 0.16].forEach((offset, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = i ? 660 : 520;
+        gain.gain.setValueAtTime(0.0001, t + offset);
+        gain.gain.exponentialRampToValueAtTime(0.05, t + offset + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + offset + 0.14);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(t + offset);
+        osc.stop(t + offset + 0.15);
+      });
+    };
+    blip();
+    thinkingTimer = setInterval(blip, 1100);
+  } catch { /* no audio: the visible status still shows */ }
+}
+
+export function stopThinking() {
+  clearInterval(thinkingTimer);
+  thinkingTimer = null;
 }
