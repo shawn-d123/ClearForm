@@ -28,6 +28,8 @@ export function spokenValue(field, value) {
     return value.split(" ").map((group) => group.split("").join(" ")).join(", ");
   }
   if (field.id === "apptType" && value === "GP") return "G P";
+  // An appointment date is always in the coming weeks: the year is just noise.
+  if (field.type === "date" && field.id !== "dob") return displayValue(field, value).replace(/ \d{4}$/, "");
   return displayValue(field, value);
 }
 
@@ -68,7 +70,7 @@ export function confirmMultiSpeech(values) {
   const lines = fields
     .filter((f) => values[f.id])
     .map((f) => `${f.label}: ${spokenValue(f, values[f.id])}.`);
-  return `I heard ${lines.length} answers. ${lines.join(" ")} Is that all right? Say yes, or no.`;
+  return `${lines.join(" ")} Is that right?`;
 }
 
 /** The missing-field message, used on screen, in the live region and spoken. */
@@ -97,13 +99,11 @@ export function showErrorSummary(missing, onFix) {
   }
   box.hidden = false;
   box.focus();
-  const first = missing[0];
-  return `There is a problem. ${missing.map(missingMessage).join(" ")} Say yes to add your ${first.label.toLowerCase()} now.`;
+  return `${missing.map(missingMessage).join(" ")} Add it now?`;
 }
 
-export function confirmSpeech(field, value, viaVoice) {
-  const verb = viaVoice ? "I heard" : "You entered";
-  return `${verb}: ${spokenValue(field, value)}. Is that right? Say yes, or no.`;
+export function confirmSpeech(field, value) {
+  return `${spokenValue(field, value)}. Is that right?`;
 }
 
 /**
@@ -136,8 +136,9 @@ export function readBack(answers, onChange) {
   showScreen("review-screen");
   $("review-heading").focus();
 
-  const lines = fields.map((f) => `${f.label}: ${spokenValue(f, answers[f.id])}.`);
-  return `Please check your answers. ${lines.join(" ")} To send your request, say submit. To change an answer, say change, and the question, for example, change date of birth.`;
+  // Skipped optional answers are shown on screen but not read out, to keep it brisk.
+  const lines = fields.filter((f) => answers[f.id]).map((f) => `${f.label}: ${spokenValue(f, answers[f.id])}.`);
+  return `Here's your booking. ${lines.join(" ")} Say submit to send it, or change something.`;
 }
 
 /** Find which field a spoken "change ..." refers to. */
@@ -173,6 +174,5 @@ export function submit(answers) {
   $("done-ref").textContent = ref;
   showScreen("done-screen");
   $("done-heading").focus();
-  const spokenRef = ref.replace("-", " ").split("").join(" ");
-  return `Your appointment request has been sent. Your reference number is ${spokenRef}. We will contact you to confirm the time.`;
+  return "Done. Your request is sent, and we'll call to confirm the time.";
 }

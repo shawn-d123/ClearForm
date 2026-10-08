@@ -2,7 +2,7 @@
 // ask it aloud, take a spoken or typed answer, read it back, confirm, move on.
 // At the end, read the whole form back and submit only on confirmation.
 
-import { fields, answers, questionFor, hintFor, listOptions } from "./form-schema.js";
+import { fields, answers, questionFor, listOptions } from "./form-schema.js";
 import {
   renderBrokenForm, renderAccessibleForm, getStepEl, getFocusTarget, getRawValue,
   setFieldValue, showFieldError, clearFieldError, clearErrors, announce,
@@ -90,6 +90,7 @@ function interpret(field, raw) {
       return { value: v };
     }
   }
+  if (field.id === "reason") return { value: text[0].toUpperCase() + text.slice(1) };
   if (field.type === "choice") {
     const v = matchChoice(text, field.options);
     return v ? { value: v } : { error: `Choose ${listOptions(field.options)}.` };
@@ -172,7 +173,7 @@ function listen(handler) {
     .then((text) => {
       if (token !== listenToken) return;
       setListeningUI(null);
-      if (!text) return say("I didn't hear anything. Press Speak answer to try again, or type your answer.");
+      if (!text) return say("I didn't catch that. Press Speak answer, or type it.");
       handler(text);
     })
     .catch((err) => {
@@ -184,9 +185,9 @@ function listen(handler) {
         updateToggles();
         say("I can't use the microphone. Please allow microphone access, or type your answer.");
       } else if (err.code === "no-speech") {
-        say("I didn't hear anything. Press Speak answer to try again, or type your answer.");
+        say("I didn't catch that. Press Speak answer, or type it.");
       } else if (err.code === "ai-failed" && canListen) {
-        say("Sorry, I lost my connection. Please say that again.", { then: () => listen(handler) });
+        say("Sorry, say that again?", { then: () => listen(handler) });
       } else {
         say("Sorry, voice input isn't working right now. Please type your answer.");
       }
@@ -235,9 +236,21 @@ function showQuestion(index, { prefix = "", keepValue = false } = {}) {
   target.focus();
   if (target.select && target.value) target.select();
 
-  const hint = hintFor(field);
-  const text = `${prefix ? prefix + " " : ""}Question ${index + 1} of ${fields.length}. ${questionFor(field)} ${hint}`;
+  const text = `${prefix ? prefix + " " : ""}${spokenQuestion(field)}`;
   speak(text, { onend: thenListen(onSpokenAnswer) });
+}
+
+/**
+ * What is said for a question: kept short for a natural pace. The full hint
+ * stays on screen (and is read by a screen reader via aria-describedby).
+ */
+function spokenQuestion(field) {
+  const q = questionFor(field);
+  if (field.type === "choice") {
+    const named = field.options.every((o) => q.toLowerCase().includes(o.toLowerCase()));
+    return named ? q : `${q} ${listOptions(field.options)}?`;
+  }
+  return field.required ? q : `${q} Optional, you can say skip.`;
 }
 
 async function onSpokenAnswer(text) {
@@ -301,7 +314,7 @@ function takeAnswer(raw, viaVoice) {
     state.misses++;
     showFieldError(field.id, error);
     const retry = viaVoice && state.misses < 3;
-    speak(`Sorry. ${error}`, { onend: retry ? thenListen(onSpokenAnswer) : undefined });
+    speak(error, { onend: retry ? thenListen(onSpokenAnswer) : undefined });
     return;
   }
   state.misses = 0;
@@ -317,12 +330,12 @@ function skip() {
   const field = current();
   if (field.required) {
     showFieldError(field.id, `This question is needed. ${questionFor(field)}`);
-    speak(`This question can't be skipped. ${questionFor(field)}`, { onend: thenListen(onSpokenAnswer) });
+    speak(`I need this one. ${questionFor(field)}`, { onend: thenListen(onSpokenAnswer) });
     return;
   }
   answers[field.id] = "";
   setFieldValue(field.id, "");
-  advance(`Skipped ${field.label.toLowerCase()}.`);
+  advance("Skipped.");
 }
 
 /** The next question without an answer, after `from`, wrapping to the start. */
@@ -342,11 +355,11 @@ function goBack() {
   if (state.mode === "confirm") return rejectAnswer();
   if (state.mode === "review") {
     state.returnToReview = false;
-    return showQuestion(fields.length - 1, { prefix: "Going back." });
+    return showQuestion(fields.length - 1, { prefix: "Okay." });
   }
   if (state.index === 0) return say("This is the first question.");
   state.returnToReview = false;
-  showQuestion(state.index - 1, { prefix: "Going back." });
+  showQuestion(state.index - 1, { prefix: "Okay." });
 }
 
 function runCommand(cmd) {
@@ -370,7 +383,7 @@ function showConfirm() {
   state.mode = "confirm";
   const field = current();
   renderConfirm(field, state.pending, state.index);
-  speak(confirmSpeech(field, state.pending, state.viaVoice), { onend: thenListen(onSpokenConfirm) });
+  speak(confirmSpeech(field, state.pending), { onend: thenListen(onSpokenConfirm) });
 }
 
 let confirmMisses = 0;
@@ -382,7 +395,7 @@ function onSpokenConfirm(text) {
   if (isYes(text)) { confirmMisses = 0; return acceptAnswer(); }
   confirmMisses++;
   const retry = confirmMisses < 3;
-  say("Please say yes, or no.", { then: retry ? thenListen(onSpokenConfirm) : undefined });
+  say("Yes, or no?", { then: retry ? thenListen(onSpokenConfirm) : undefined });
 }
 
 function acceptAnswer() {
@@ -394,7 +407,7 @@ function acceptAnswer() {
     }
     state.pendingMulti = null;
     const remaining = fields.filter((f) => !(f.id in answers)).length;
-    return advance(remaining ? `Got it. ${remaining === 1 ? "Just one more question." : `Just ${remaining} more questions.`}` : "Got it.");
+    return advance(remaining ? `Got it. ${remaining === 1 ? "One more." : `${remaining} more.`}` : "Got it.");
   }
   const field = current();
   answers[field.id] = state.pending;
@@ -406,10 +419,10 @@ function acceptAnswer() {
 function rejectAnswer() {
   if (state.pendingMulti) {
     state.pendingMulti = null;
-    return showQuestion(state.index, { prefix: "Okay, let's go one question at a time." });
+    return showQuestion(state.index, { prefix: "Okay, one at a time." });
   }
   state.pending = null;
-  showQuestion(state.index, { prefix: "Okay, let's try that again.", keepValue: true });
+  showQuestion(state.index, { prefix: "Okay.", keepValue: true });
 }
 
 // --- review and submit -------------------------------------------------------
@@ -431,7 +444,7 @@ function showReview(prefix = "") {
 
 function changeField(id) {
   state.returnToReview = true;
-  showQuestion(fields.findIndex((f) => f.id === id), { prefix: "Changing your answer." });
+  showQuestion(fields.findIndex((f) => f.id === id), { prefix: "Sure." });
 }
 
 let reviewMisses = 0;
@@ -442,13 +455,13 @@ function onSpokenReview(text) {
   if (/\b(change|edit|fix|update)\b/i.test(text)) {
     const id = fieldFromSpeech(text);
     if (id) { reviewMisses = 0; return changeField(id); }
-    return say("Which answer would you like to change? For example, say change date of birth.", { then: thenListen(onSpokenReview) });
+    return say("Which one? For example, change date of birth.", { then: thenListen(onSpokenReview) });
   }
   const missing = missingRequired(answers);
   if (missing.length && isYes(text)) { reviewMisses = 0; return changeField(missing[0].id); }
   if (isYes(text)) { reviewMisses = 0; return trySubmit(); }
   reviewMisses++;
-  say("Say submit to send your request, or change and the question to edit an answer.",
+  say("Say submit, or change and the answer.",
     { then: reviewMisses < 3 ? thenListen(onSpokenReview) : undefined });
 }
 
@@ -476,9 +489,9 @@ export function startAccessibleMode() {
   for (const k of Object.keys(answers)) delete answers[k];
   state.returnToReview = false;
   state.pendingMulti = null;
-  const oneGo = ai.ready ? " Or, if you like, tell me everything in one go." : "";
+  const oneGo = ai.ready ? " Or say it all in one go." : "";
   showQuestion(0, {
-    prefix: `Accessible mode on. Booking an appointment. I'll ask ${fields.length} questions, one at a time. You can speak or type each answer, and say back, repeat, or skip at any time.${oneGo}`,
+    prefix: `Accessible mode on. ${fields.length} quick questions. Speak or type your answers.${oneGo}`,
   });
 }
 

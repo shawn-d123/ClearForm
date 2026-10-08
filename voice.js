@@ -10,7 +10,7 @@ const Recognition = typeof window !== "undefined"
   ? window.SpeechRecognition || window.webkitSpeechRecognition
   : null;
 
-let rate = 0.95;
+let rate = 1.1; // a natural conversational pace
 let muted = false;
 let lastText = "";
 let lastOnend = null;
